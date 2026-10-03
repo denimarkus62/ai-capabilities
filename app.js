@@ -41,6 +41,10 @@
       return p;
     });
   }
+  window.PROFESSIONS.forEach(function (p) {
+    var r = window.REPORTS && window.REPORTS[p.n];
+    if (r) p.t.push([r[0], r[1], r[2], r[3] || window.REPORTS_VIA, "r"]);
+  });
   var profs = prep(window.PROFESSIONS, "p");
   var svcs = prep(window.SERVICES, "s");
   var byName = { p: {}, s: {} };
@@ -67,7 +71,7 @@
     off:  { name: "Не подключилось", color: "m-none" }
   };
   var CAP_ORDER = ["on", "part", "auth", "off"];
-  var state = { capSt: "", tipCat: "", tab: "p", q: "", deep: false, cat: "", mode: "", acc: "", score: "", sort: "score" };
+  var state = { auto: { p: false, s: false }, capSt: "", tipCat: "", tab: "p", q: "", deep: false, cat: "", mode: "", acc: "", score: "", sort: "score" };
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function band(v) { for (var i = 0; i < BANDS.length; i++) if (v >= BANDS[i].min) return BANDS[i]; return BANDS[3]; }
@@ -156,7 +160,7 @@
     var r = [q];
     var sq = stem(q);
     if (sq !== q) r.push(sq);
-    if (q.length >= 8 && /[а-я]/.test(q)) r.push(q.slice(0, q.length - 2));
+    if (q.length >= 8 && /(ия|ие|ии|ию)$/.test(q)) r.push(q.slice(0, q.length - 2));
     SYN.forEach(function (g) {
       if (g.some(function (m) { return m === q || (q.length >= 3 && m.indexOf(q) === 0); })) g.forEach(function (m) { if (r.indexOf(m) < 0) r.push(m); });
     });
@@ -177,7 +181,7 @@
   }
   function matchQ(p) {
     if (!state.q) return true;
-    return qMain(p) || (state.deep && qDeep(p));
+    return qMain(p) || ((state.deep || state.auto[p.key[0]]) && qDeep(p));
   }
   function matchNoCat(p) {
     if (state.mode && !p.modes[state.mode]) return false;
@@ -189,9 +193,18 @@
     return matchQ(p);
   }
   function match(p) { return (!state.cat || p.c === state.cat) && matchNoCat(p); }
+  function computeAuto() {
+    [["p", profs], ["s", svcs]].forEach(function (x) {
+      var on = false;
+      if (state.q && !state.deep) {
+        on = !x[1].some(qMain) && x[1].some(qDeep);
+      }
+      state.auto[x[0]] = on;
+    });
+  }
   function filtersOn() { return !!(state.q || state.mode || state.acc || state.score); }
   function extraCount() {
-    if (!state.q || state.deep) return 0;
+    if (!state.q || state.deep || state.auto[state.tab]) return 0;
     return cur().filter(function (p) {
       var save = state.deep; state.deep = true;
       var ok = (!state.cat || p.c === state.cat) && matchNoCat(p);
@@ -233,9 +246,11 @@
     var rel = p.key[0] === "s"
       ? (p.prof.length ? '<div class="rel">Нужен профессиям: ' + p.prof.length + '</div>' : '')
       : (p.svc.length ? '<div class="rel">Сервисы: ' + p.svc.slice(0, 3).map(function (s) { return esc(s.n); }).join(", ") + (p.svc.length > 3 ? " и еще " + (p.svc.length - 3) : "") + '</div>' : '');
+    var rt = p.t.filter(function (t) { return t[4] === "r"; })[0];
+    var repLine = rt ? '<div class="repline">Отчеты и дашборды: <b>' + rt[1] + '</b> из 10</div>' : "";
     return '<button class="card" data-key="' + p.key + '"><div class="head"><div><h3>' + esc(p.n) + '</h3><div class="sub2">' + sub + '</div></div>' +
       '<div class="score ' + b.cls + '"><span>' + fmt(p.avg) + '</span></div></div>' +
-      '<p>' + esc(p.d) + '</p><div class="mix">' + mix(p) + '</div><div class="tags">' + tags + '</div>' + rel + '</button>';
+      '<p>' + esc(p.d) + '</p><div class="mix">' + mix(p) + '</div><div class="tags">' + tags + '</div>' + repLine + rel + '</button>';
   }
 
   function renderGrid() {
@@ -245,7 +260,7 @@
     else list.sort(function (a, b) { return a.n.localeCompare(b.n, "ru"); });
     var total = state.cat ? cur().filter(function (p) { return p.c === state.cat; }).length : cur().length;
     var ex = extraCount();
-    var note = ex ? ' <button class="link" data-deep="1">Еще ' + ex + ', где слово упоминается в описаниях и задачах. Показать</button>' : (state.q && state.deep ? ' <button class="link" data-deep="0">Показаны и упоминания в описаниях. Скрыть</button>' : "");
+    var note = ex ? ' <button class="link" data-deep="1">Еще ' + ex + ', где слово упоминается в описаниях и задачах. Показать</button>' : (state.q && state.deep ? ' <button class="link" data-deep="0">Показаны и упоминания в описаниях. Скрыть</button>' : (state.auto[state.tab] ? " В названиях совпадений нет, показаны упоминания в описаниях и задачах." : ""));
     var rst = (filtersOn() && !state.cat) ? ' <button class="link" data-reset="1">Сбросить фильтры</button>' : "";
     $("count").innerHTML = "Показано: " + list.length + " из " + total + note + rst;
     if (!list.length) { $("grid").innerHTML = '<p class="empty">Ничего не нашли. Попробуйте другое слово или сбросьте фильтры.</p>'; return; }
@@ -329,6 +344,7 @@
   function refresh() {
     if (state.tab === "k") { renderCaps(); renderTabs(); return; }
     if (state.tab === "t") { renderTips(); renderTabs(); return; }
+    computeAuto();
     renderCats(); applyCatView(); renderGrid(); renderTabs();
   }
   function resetFilters() {
@@ -339,6 +355,7 @@
   }
 
   function setTab(t, keepQ) {
+    computeAuto();
     state.tab = t; state.cat = ""; state.mode = ""; state.acc = ""; state.score = "";
     $("mode").value = ""; $("acc").value = ""; $("score").value = "";
     var c = isSpecial(t);
@@ -366,12 +383,12 @@
     var p = (kind === "s" ? svcs : profs).filter(function (x) { return x.id === id; })[0];
     if (!p) return;
     var b = band(p.avg);
-    var rows = p.t.slice().sort(function (a, c) { return c[1] - a[1]; }).map(function (t) {
+    var rows = p.t.slice().sort(function (a, c) { return ((c[4] === "r") - (a[4] === "r")) || (c[1] - a[1]); }).map(function (t) {
       var bk = bandKey(t[1]);
       var m = MODES[t[2]];
-      return '<div class="task"><div><div class="tt">' + esc(t[0]) + '</div>' +
+      return '<div class="task' + (t[4] === "r" ? " rep" : "") + '"><div><div class="tt">' + esc(t[0]) + '</div>' +
         (t[3] ? '<div class="via">' + esc(t[3]) + '</div>' : '') +
-        '<span class="badge ' + m.color + '" title="' + esc(m.hint) + '">' + m.name + '</span></div>' +
+        '<span class="badge ' + m.color + '" title="' + esc(m.hint) + '">' + m.name + '</span>' + (t[4] === "r" ? ' <span class="badge m-rep">Отчеты и дашборды</span>' : "") + '</div>' +
         '<div class="meter"><div class="mbar"><i style="width:' + t[1] * 10 + '%;background:' + BAR_COLOR[bk] + '"></i></div><span class="num">' + t[1] + '</span></div></div>';
     }).join("");
     var link = location.href.split("#")[0] + "#" + p.key;
