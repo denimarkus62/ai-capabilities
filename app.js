@@ -153,15 +153,17 @@
     return r;
   }
   function hit(hay, t) {
-    if (t.length > 2) return hay.indexOf(t) >= 0;
-    return new RegExp("(^|[^a-zа-я0-9])" + t.replace(/[^a-zа-я0-9]/g, "")).test(hay);
+    if (t.length > 3) return hay.indexOf(t) >= 0;
+    var c = t.replace(/[^a-zа-я0-9]/g, "");
+    if (!c) return false;
+    return new RegExp("(^|[^a-zа-я0-9])" + c).test(hay);
   }
   function words() { return state.q.split(/\s+/).filter(Boolean); }
   function qMain(p) {
     return words().every(function (w) { return terms(w).some(function (t) { return hit(hayMain(p), t) || svcExact(p, t); }); });
   }
   function qDeep(p) {
-    return words().every(function (w) { return terms(w).some(function (t) { return hit(hayMain(p), t) || hit(hayDeep(p), t); }); });
+    return words().every(function (w) { return terms(w).some(function (t) { return hit(hayMain(p), t) || svcExact(p, t) || hit(hayDeep(p), t); }); });
   }
   function matchQ(p) {
     if (!state.q) return true;
@@ -232,7 +234,8 @@
     var total = state.cat ? cur().filter(function (p) { return p.c === state.cat; }).length : cur().length;
     var ex = extraCount();
     var note = ex ? ' <button class="link" data-deep="1">Еще ' + ex + ', где слово упоминается в описаниях и задачах. Показать</button>' : (state.q && state.deep ? ' <button class="link" data-deep="0">Показаны и упоминания в описаниях. Скрыть</button>' : "");
-    $("count").innerHTML = "Показано: " + list.length + " из " + total + note;
+    var rst = (filtersOn() && !state.cat) ? ' <button class="link" data-reset="1">Сбросить фильтры</button>' : "";
+    $("count").innerHTML = "Показано: " + list.length + " из " + total + note + rst;
     if (!list.length) { $("grid").innerHTML = '<p class="empty">Ничего не нашли. Попробуйте другое слово или сбросьте фильтры.</p>'; return; }
     $("grid").innerHTML = list.map(cardHtml).join("");
   }
