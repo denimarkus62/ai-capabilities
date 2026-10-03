@@ -43,7 +43,11 @@
   }
   window.PROFESSIONS.forEach(function (p) {
     var r = window.REPORTS && window.REPORTS[p.n];
-    if (r) p.t.push([r[0], r[1], r[2], r[3] || window.REPORTS_VIA, "r"]);
+    if (r) {
+      var priv = (window.REPORTS_PRIVATE || []).indexOf(p.n) >= 0;
+      var via = r[3] ? r[3] + (priv ? "; только закрытый артефакт или файл, не публиковать на GitHub Pages" : "") : (priv ? window.REPORTS_VIA_PRIVATE : window.REPORTS_VIA);
+      p.t.push([r[0], r[1], r[2], via, "r"]);
+    }
   });
   var profs = prep(window.PROFESSIONS, "p");
   var svcs = prep(window.SERVICES, "s");
