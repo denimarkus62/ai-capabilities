@@ -39,6 +39,7 @@
           <option value="scoreAsc">Сначала слабые стороны</option>
           <option value="name">По алфавиту</option>
         </select>
+        <select id="score" aria-label="Балл"></select>
         <select id="mode" aria-label="Способ"></select>
         <select id="acc" aria-label="Доступ" hidden></select>
       </div>
@@ -49,6 +50,8 @@
   <p class="hint" id="hintOther"></p>
 
   <section class="cats" id="cats" aria-label="Средний балл по направлениям"></section>
+
+  <div class="cathead" id="catHead" hidden></div>
 
   <p class="count" id="count" aria-live="polite"></p>
   <section class="grid" id="grid"></section>

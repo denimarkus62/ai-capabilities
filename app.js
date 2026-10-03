@@ -57,7 +57,8 @@
   function cats(list) { var r = []; list.forEach(function (p) { if (r.indexOf(p.c) < 0) r.push(p.c); }); return r; }
   var CATS = { p: cats(profs), s: cats(svcs) };
 
-  var state = { tab: "p", q: "", cat: "", mode: "", acc: "", sort: "score" };
+  var SCORES = [["", "Балл: любой", 0, 11], ["8", "Балл: 8 и выше", 8, 11], ["7", "Балл: 7 и выше", 7, 11], ["6", "Балл: 6 и выше", 6, 11], ["5-7", "Балл: от 5 до 7", 5, 7], ["lt5", "Балл: ниже 5", 0, 5]];
+  var state = { tab: "p", q: "", cat: "", mode: "", acc: "", score: "", sort: "score" };
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function band(v) { for (var i = 0; i < BANDS.length; i++) if (v >= BANDS[i].min) return BANDS[i]; return BANDS[3]; }
@@ -84,8 +85,26 @@
     $("cats").innerHTML = CATS[state.tab].map(function (c) {
       var l = list.filter(function (p) { return p.c === c; });
       var a = Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10;
-      return '<div class="catrow"><span>' + esc(c) + ' <small>' + l.length + '</small></span><span class="bar"><i style="width:' + a * 10 + '%;background:' + BAR_COLOR[bandKey(a)] + '"></i></span><em>' + fmt(a) + '</em></div>';
+      return '<button class="catrow" data-catgo="' + esc(c) + '" title="Открыть список"><span>' + esc(c) + ' <small>' + l.length + '</small></span><span class="bar"><i style="width:' + a * 10 + '%;background:' + BAR_COLOR[bandKey(a)] + '"></i></span><em>' + fmt(a) + '</em></button>';
     }).join("");
+  }
+
+  function catHeadHtml() {
+    var l = cur().filter(function (p) { return p.c === state.cat; });
+    var a = Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10;
+    var noun = state.tab === "s" ? "сервисов" : "профессий";
+    return '<button class="back" data-catgo="">← Все направления</button><div><h2>' + esc(state.cat) + '</h2><span>' + l.length + ' ' + noun + ', средний балл ' + fmt(a) + '</span></div>';
+  }
+  function applyCatView() {
+    var inCat = state.tab !== "c" && !!state.cat;
+    $("cats").hidden = state.tab === "c" || inCat;
+    $("catHead").hidden = !inCat;
+    if (inCat) $("catHead").innerHTML = catHeadHtml();
+  }
+  function selectCat(c, scroll) {
+    state.cat = c || "";
+    renderChips(); applyCatView(); renderGrid();
+    if (scroll) { var el = c ? $("catHead") : $("cats"); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: "smooth", block: "start" }); }
   }
 
   function renderChips() {
@@ -128,6 +147,10 @@
     if (state.cat && p.c !== state.cat) return false;
     if (state.mode && !p.modes[state.mode]) return false;
     if (state.tab === "s" && state.acc && p.a !== state.acc) return false;
+    if (state.score) {
+      var sf = SCORES.filter(function (x) { return x[0] === state.score; })[0];
+      if (p.avg < sf[2] || p.avg >= sf[3]) return false;
+    }
     return matchQ(p);
   }
 
@@ -155,9 +178,10 @@
     var tags = MODE_ORDER.filter(function (k) { return p.modes[k]; }).map(function (k) {
       return '<span class="tag"><b>' + p.modes[k] + '</b> ' + MODES[k].name.toLowerCase() + '</span>';
     }).join("");
+    var catLink = '<span class="cat catlink" role="link" tabindex="0" data-catgo="' + esc(p.c) + '" data-tab="' + p.key[0] + '">' + esc(p.c) + '</span>';
     var sub = p.key[0] === "s"
-      ? '<span class="badge ' + ACCESS[p.a].color + '" title="' + esc(ACCESS[p.a].hint) + '">' + ACCESS[p.a].name + '</span> <span class="cat">' + esc(p.c) + '</span>'
-      : '<span class="cat">' + esc(p.c) + '</span>';
+      ? '<span class="badge ' + ACCESS[p.a].color + '" title="' + esc(ACCESS[p.a].hint) + '">' + ACCESS[p.a].name + '</span> ' + catLink
+      : catLink;
     var rel = p.key[0] === "s"
       ? (p.prof.length ? '<div class="rel">Нужен профессиям: ' + p.prof.length + '</div>' : '')
       : (p.svc.length ? '<div class="rel">Сервисы: ' + p.svc.slice(0, 3).map(function (s) { return esc(s.n); }).join(", ") + (p.svc.length > 3 ? " и еще " + (p.svc.length - 3) : "") + '</div>' : '');
@@ -189,12 +213,13 @@
   }
 
   function setTab(t, keepQ) {
-    state.tab = t; state.cat = ""; state.mode = ""; state.acc = "";
-    $("mode").value = ""; $("acc").value = "";
+    state.tab = t; state.cat = ""; state.mode = ""; state.acc = ""; state.score = "";
+    $("mode").value = ""; $("acc").value = ""; $("score").value = "";
     var c = t === "c";
-    $("filters").hidden = c; $("cats").hidden = c; $("count").hidden = c; $("grid").hidden = c; $("hintOther").hidden = c;
+    $("filters").hidden = c; $("count").hidden = c; $("grid").hidden = c; $("hintOther").hidden = c;
     $("connect").hidden = !c;
     $("acc").hidden = t !== "s";
+    applyCatView();
     if (!c) { renderChips(); renderCats(); renderGrid(); }
     renderTabs();
   }
@@ -224,7 +249,7 @@
     var acc = kind === "s" ? '<span class="badge ' + ACCESS[p.a].color + '" title="' + esc(ACCESS[p.a].hint) + '">' + ACCESS[p.a].name + '</span> ' : "";
     var related = kind === "s" ? listHtml(p.prof, "Профессии, которым это нужно") : listHtml(p.svc, "Сервисы и инструменты для этой профессии");
     $("mBody").innerHTML =
-      '<div class="mh"><div class="score ' + b.cls + '"><span>' + fmt(p.avg) + '</span></div><div><h2 id="mTitle">' + esc(p.n) + '</h2><div class="cat" style="color:var(--muted)">' + acc + esc(p.c) + '</div></div></div>' +
+      '<div class="mh"><div class="score ' + b.cls + '"><span>' + fmt(p.avg) + '</span></div><div><h2 id="mTitle">' + esc(p.n) + '</h2><div class="cat" style="color:var(--muted)">' + acc + '<span class="catlink" role="link" tabindex="0" data-catgo="' + esc(p.c) + '" data-tab="' + kind + '">' + esc(p.c) + '</span></div></div></div>' +
       '<p class="desc">' + esc(p.d) + '</p>' + rows +
       '<div class="box"><b>Чего не могу</b>' + esc(p.l) + '</div>' +
       '<div class="box"><b>Что подключить, чтобы стало лучше</b>' + esc(p.k) + '</div>' + related +
@@ -254,12 +279,14 @@
 
   function init() {
     $("acc").innerHTML = '<option value="">Любой доступ</option>' + ACCESS_ORDER.map(function (k) { return '<option value="' + k + '">' + ACCESS[k].name + '</option>'; }).join("");
+    $("score").innerHTML = SCORES.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join("");
+    $("score").addEventListener("change", function (e) { state.score = e.target.value; renderGrid(); });
     $("mode").innerHTML = '<option value="">Любой способ</option>' + MODE_ORDER.map(function (k) { return '<option value="' + k + '">' + MODES[k].name + '</option>'; }).join("");
     $("suggest").href = "https://github.com/" + REPO + "/issues/new?title=" + encodeURIComponent("Добавить: ");
     $("tabs").addEventListener("click", function (e) { var b = e.target.closest("[role=tab]"); if (b) setTab(b.getAttribute("data-tab")); });
     $("chips").addEventListener("click", function (e) {
       var b = e.target.closest(".chip"); if (!b) return;
-      state.cat = b.getAttribute("data-cat"); renderChips(); renderGrid();
+      selectCat(b.getAttribute("data-cat"), false);
     });
     $("q").addEventListener("input", function (e) {
       state.q = e.target.value.trim().toLowerCase();
@@ -271,12 +298,24 @@
     $("acc").addEventListener("change", function (e) { state.acc = e.target.value; renderGrid(); });
     $("hintOther").addEventListener("click", function (e) { var b = e.target.closest("[data-go]"); if (b) setTab(b.getAttribute("data-go")); });
     document.addEventListener("click", function (e) {
+      var g = e.target.closest("[data-catgo]");
+      if (g) {
+        e.preventDefault(); e.stopPropagation();
+        var tab = g.getAttribute("data-tab");
+        if (!$("modal").hidden) { $("modal").hidden = true; document.body.style.overflow = ""; history.replaceState(null, "", location.pathname + location.search); }
+        if (tab && tab !== state.tab) setTab(tab);
+        selectCat(g.getAttribute("data-catgo"), true);
+        return;
+      }
       var c = e.target.closest("[data-key]");
       if (c) openItem(c.getAttribute("data-key"), true);
     });
     $("close").addEventListener("click", closeItem);
     $("modal").addEventListener("click", function (e) { if (e.target === $("modal")) closeItem(); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("modal").hidden) closeItem(); });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && !$("modal").hidden) closeItem();
+      if ((e.key === "Enter" || e.key === " ") && e.target.classList && e.target.classList.contains("catlink")) { e.preventDefault(); e.target.click(); }
+    });
     window.addEventListener("hashchange", function () { var k = hashKey(); if (k) openItem(k, false); else if (!$("modal").hidden) { $("modal").hidden = true; document.body.style.overflow = ""; } });
     renderStats(); renderLegend(); renderConnect(); setTab("p");
     var k = hashKey();
