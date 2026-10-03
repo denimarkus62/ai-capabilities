@@ -58,12 +58,22 @@
   var CATS = { p: cats(profs), s: cats(svcs) };
 
   var SCORES = [["", "Балл: любой", 0, 11], ["8", "Балл: 8 и выше", 8, 11], ["7", "Балл: 7 и выше", 7, 11], ["6", "Балл: 6 и выше", 6, 11], ["5-7", "Балл: от 5 до 7", 5, 7], ["lt5", "Балл: ниже 5", 0, 5]];
-  var state = { tab: "p", q: "", deep: false, cat: "", mode: "", acc: "", score: "", sort: "score" };
+  var caps = window.CAPS.slice();
+  var tips = window.TIPS.map(function (x, i) { x.id = i + 1; return x; });
+  var CAP_ST = {
+    on:   { name: "Работает сейчас", color: "m-own" },
+    part: { name: "Частично", color: "m-api" },
+    auth: { name: "Нужна авторизация", color: "m-conn" },
+    off:  { name: "Не подключилось", color: "m-none" }
+  };
+  var CAP_ORDER = ["on", "part", "auth", "off"];
+  var state = { capSt: "", tipCat: "", tab: "p", q: "", deep: false, cat: "", mode: "", acc: "", score: "", sort: "score" };
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function band(v) { for (var i = 0; i < BANDS.length; i++) if (v >= BANDS[i].min) return BANDS[i]; return BANDS[3]; }
   function bandKey(v) { return band(v).cls.slice(2); }
   function fmt(v) { return String(v).replace(".", ","); }
+  function isSpecial(t) { return t === "c" || t === "k" || t === "t"; }
   function cur() { return state.tab === "s" ? svcs : profs; }
 
   function renderStats() {
@@ -101,8 +111,8 @@
     return '<button class="back" data-catgo="">← Все направления</button><div><h2>' + esc(state.cat) + '</h2><span>' + num + (l.length ? ', средний балл ' + fmt(a) : "") + '.' + reset + '</span></div>';
   }
   function applyCatView() {
-    var inCat = state.tab !== "c" && !!state.cat;
-    $("cats").hidden = state.tab === "c" || inCat;
+    var inCat = !isSpecial(state.tab) && !!state.cat;
+    $("cats").hidden = isSpecial(state.tab) || inCat;
     $("catHead").hidden = !inCat;
     if (inCat) $("catHead").innerHTML = catHeadHtml();
   }
@@ -129,7 +139,7 @@
     return (p.d + " " + p.t.map(function (t) { return t[0] + " " + (t[3] || ""); }).join(" ")).toLowerCase();
   }
   function stem(w) {
-    var s = w.replace(/(ами|ями|ов|ев|ей|ом|ем|ам|ям|ах|ях|ы|и|а|я|у|ю|е|о)$/, "");
+    var s = w.replace(/(ами|ями|ов|ев|ей|ом|ем|ам|ям|ах|ях|ы|и|а|я|у|ю|е|о|ь|й)$/, "");
     return s.length >= 4 ? s : w;
   }
   var SYN = [
@@ -203,7 +213,9 @@
     $("tabP").innerHTML = 'Профессии <span>' + (q ? qp + " из " : "") + profs.length + '</span>';
     $("tabS").innerHTML = 'Сервисы <span>' + (q ? qs + " из " : "") + svcs.length + '</span>';
     $("tabC").innerHTML = 'Что подключить в первую очередь';
-    [["tabP", "p"], ["tabS", "s"], ["tabC", "c"]].forEach(function (x) { $(x[0]).setAttribute("aria-selected", state.tab === x[1] ? "true" : "false"); });
+    $("tabK").innerHTML = 'Мои возможности <span>' + caps.length + '</span>';
+    $("tabT").innerHTML = 'Советы <span>' + tips.length + '</span>';
+    [["tabP", "p"], ["tabS", "s"], ["tabC", "c"], ["tabK", "k"], ["tabT", "t"]].forEach(function (x) { $(x[0]).setAttribute("aria-selected", state.tab === x[1] ? "true" : "false"); });
     $("hintOther").innerHTML = "";
     if (q && state.tab === "p" && qp === 0 && qs > 0) $("hintOther").innerHTML = 'Среди профессий ничего нет, но в сервисах нашлось: ' + qs + '. <button class="link" data-go="s">Показать сервисы</button>';
     if (q && state.tab === "s" && qs === 0 && qp > 0) $("hintOther").innerHTML = 'Среди сервисов ничего нет, но в профессиях нашлось: ' + qp + '. <button class="link" data-go="p">Показать профессии</button>';
@@ -252,7 +264,73 @@
     }).join("");
   }
 
-  function refresh() { renderCats(); applyCatView(); renderGrid(); renderTabs(); }
+  function textMatch(hay) {
+    if (!state.q) return true;
+    hay = hay.toLowerCase();
+    return words().every(function (w) { return terms(w).some(function (t) { return hit(hay, t); }); });
+  }
+
+  function renderCaps() {
+    $("capsNote").textContent = window.CAPS_NOTE;
+    var base = caps.filter(function (c) { return textMatch(c.n + " " + c.d + " " + c.ex + " " + c.g + " " + c.k); });
+    var chips = ['<button class="chip" data-capst="" aria-pressed="' + (state.capSt === "") + '">Все ' + base.length + '</button>'].concat(CAP_ORDER.map(function (k) {
+      var n = base.filter(function (c) { return c.st === k; }).length;
+      return '<button class="chip" data-capst="' + k + '" aria-pressed="' + (state.capSt === k) + '">' + CAP_ST[k].name + ' ' + n + '</button>';
+    }));
+    $("capChips").innerHTML = chips.join("");
+    var list = base.filter(function (c) { return !state.capSt || c.st === state.capSt; });
+    $("capCount").textContent = "Показано: " + list.length + " из " + caps.length;
+    if (!list.length) { $("capList").innerHTML = '<p class="empty">Ничего не нашли. Попробуйте другое слово.</p>'; return; }
+    var groups = [];
+    list.forEach(function (c) { if (groups.indexOf(c.g) < 0) groups.push(c.g); });
+    $("capList").innerHTML = groups.map(function (g) {
+      var items = list.filter(function (c) { return c.g === g; });
+      return '<h3 class="gh">' + esc(g) + ' <small>' + items.length + '</small></h3><div class="cgrid">' + items.map(function (c) {
+        return '<div class="capcard"><div class="caphead"><b>' + esc(c.n) + '</b><span class="badge ' + CAP_ST[c.st].color + '">' + CAP_ST[c.st].name + '</span></div>' +
+          '<div class="kind">' + esc(c.k) + '</div><p>' + esc(c.d) + '</p>' + (c.ex ? '<div class="rel">Пригодится: ' + esc(c.ex) + '</div>' : '') + '</div>';
+      }).join("") + '</div>';
+    }).join("");
+  }
+
+  function renderTips() {
+    var TC = [];
+    tips.forEach(function (x) { if (TC.indexOf(x.c) < 0) TC.push(x.c); });
+    var base = tips.filter(function (x) { return textMatch(x.t + " " + x.d + " " + (x.p || "") + " " + x.c); });
+    var topN = base.filter(function (x) { return x.i === 3; }).length;
+    var chips = ['<button class="chip" data-tipcat="" aria-pressed="' + (state.tipCat === "") + '">Все ' + base.length + '</button>',
+      '<button class="chip" data-tipcat="__top" aria-pressed="' + (state.tipCat === "__top") + '">Важные ' + topN + '</button>'].concat(TC.map(function (c) {
+      var n = base.filter(function (x) { return x.c === c; }).length;
+      return '<button class="chip" data-tipcat="' + esc(c) + '" aria-pressed="' + (state.tipCat === c) + '">' + esc(c) + ' ' + n + '</button>';
+    }));
+    $("tipChips").innerHTML = chips.join("");
+    var list = base.filter(function (x) { return state.tipCat === "" || (state.tipCat === "__top" ? x.i === 3 : x.c === state.tipCat); });
+    $("tipCount").textContent = "Показано: " + list.length + " из " + tips.length;
+    if (!list.length) { $("tipList").innerHTML = '<p class="empty">Ничего не нашли. Попробуйте другое слово.</p>'; return; }
+    $("tipList").innerHTML = list.map(function (x) {
+      return '<article class="tip' + (x.i === 3 ? " tip-top" : "") + '"><div class="tipmeta"><span>' + esc(x.c) + '</span>' + (x.i === 3 ? '<span class="badge m-own">Важно</span>' : "") + '</div>' +
+        '<h3>' + esc(x.t) + '</h3><p>' + esc(x.d) + '</p>' +
+        (x.p ? '<div class="phrase"><span>' + esc(x.p) + '</span><button type="button" class="copy" data-copy="' + x.id + '">Скопировать</button></div>' : "") + '</article>';
+    }).join("");
+  }
+
+  function copyText(text, btn) {
+    function done() { btn.textContent = "Скопировано"; setTimeout(function () { btn.textContent = "Скопировать"; }, 1500); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallback(); });
+    } else fallback();
+    function fallback() {
+      var ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e) { btn.textContent = "Выделите вручную"; }
+      document.body.removeChild(ta);
+    }
+  }
+
+  function refresh() {
+    if (state.tab === "k") { renderCaps(); renderTabs(); return; }
+    if (state.tab === "t") { renderTips(); renderTabs(); return; }
+    renderCats(); applyCatView(); renderGrid(); renderTabs();
+  }
   function resetFilters() {
     state.q = ""; state.deep = false; state.mode = ""; state.acc = ""; state.score = "";
     $("q").value = "";
@@ -263,9 +341,11 @@
   function setTab(t, keepQ) {
     state.tab = t; state.cat = ""; state.mode = ""; state.acc = ""; state.score = "";
     $("mode").value = ""; $("acc").value = ""; $("score").value = "";
-    var c = t === "c";
+    var c = isSpecial(t);
     $("filters").hidden = c; $("count").hidden = c; $("grid").hidden = c; $("hintOther").hidden = c;
-    $("connect").hidden = !c;
+    $("connect").hidden = t !== "c"; $("caps").hidden = t !== "k"; $("tips").hidden = t !== "t";
+    if (t === "k") { state.capSt = ""; renderCaps(); }
+    if (t === "t") { state.tipCat = ""; renderTips(); }
     $("acc")._dd.wrap.hidden = t !== "s";
     ["mode", "score", "acc"].forEach(function (id) { $(id)._dd.sync(); });
     applyCatView();
@@ -400,6 +480,12 @@
     $("acc").addEventListener("change", function (e) { state.acc = e.target.value; refresh(); });
     $("hintOther").addEventListener("click", function (e) { var b = e.target.closest("[data-go]"); if (b) setTab(b.getAttribute("data-go")); });
     document.addEventListener("click", function (e) {
+      var cs = e.target.closest("[data-capst]");
+      if (cs) { state.capSt = cs.getAttribute("data-capst"); renderCaps(); return; }
+      var tc = e.target.closest("[data-tipcat]");
+      if (tc) { state.tipCat = tc.getAttribute("data-tipcat"); renderTips(); return; }
+      var cp = e.target.closest("[data-copy]");
+      if (cp) { var tp = tips.filter(function (x) { return x.id === +cp.getAttribute("data-copy"); })[0]; if (tp) copyText(tp.p, cp); return; }
       var rs = e.target.closest("[data-reset]");
       if (rs) { resetFilters(); return; }
       var dp = e.target.closest("[data-deep]");

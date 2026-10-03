@@ -26,11 +26,13 @@
   <section class="stats" id="stats" aria-label="Общая сводка"></section>
 
   <section class="panel" aria-label="Поиск">
-    <input id="q" type="search" class="big" placeholder="Что ищете? Профессию (SEO, бухгалтер) или сервис (Telegram, YouTube, 1С)" autocomplete="off">
+    <input id="q" type="search" class="big" placeholder="Что ищете? Профессию (SEO, бухгалтер), сервис (Telegram, YouTube, 1С) или совет (токены, память)" autocomplete="off">
     <div class="tabs" id="tabs" role="tablist">
       <button role="tab" id="tabP" data-tab="p" aria-selected="true"></button>
       <button role="tab" id="tabS" data-tab="s" aria-selected="false"></button>
       <button role="tab" id="tabC" data-tab="c" aria-selected="false"></button>
+      <button role="tab" id="tabK" data-tab="k" aria-selected="false"></button>
+      <button role="tab" id="tabT" data-tab="t" aria-selected="false"></button>
     </div>
     <div id="filters">
       <div class="row">
@@ -62,12 +64,28 @@
     <div class="clist" id="connectList"></div>
   </section>
 
+  <section id="caps" hidden>
+    <h2 class="h2">Что у меня подключено сейчас</h2>
+    <p class="lead" id="capsNote"></p>
+    <div class="chips" id="capChips" role="group" aria-label="Статус"></div>
+    <p class="count" id="capCount"></p>
+    <div id="capList"></div>
+  </section>
+
+  <section id="tips" hidden>
+    <h2 class="h2">Советы по работе с Claude</h2>
+    <p class="lead">Короткие правила, которые экономят токены, деньги и нервы. Нажмите «Скопировать» у готовой фразы и вставьте ее в чат. Отметка «Важно» стоит у советов, с которых лучше начать.</p>
+    <div class="chips" id="tipChips" role="group" aria-label="Темы советов"></div>
+    <p class="count" id="tipCount"></p>
+    <div class="tgrid" id="tipList"></div>
+  </section>
+
   <section class="legend" id="legend"></section>
 </main>
 
 <footer class="foot">
   <div class="wrap">
-    <p>Обновлено 03.10.2026, вторая версия. Оценки ставит сам Claude и старается не завышать. Если оценка не совпала с вашей практикой, напишите через кнопку «Предложить профессию или сервис» (откроется раздел Issues на GitHub). Мы поправим.</p>
+    <p>Обновлено 03.10.2026, третья версия. Оценки ставит сам Claude и старается не завышать. Если оценка не совпала с вашей практикой, напишите через кнопку «Предложить профессию или сервис» (откроется раздел Issues на GitHub). Мы поправим.</p>
   </div>
 </footer>
 
@@ -90,6 +108,9 @@
 <script src="svc2.js"></script>
 <script src="svc3.js"></script>
 <script src="svc4.js"></script>
+<script src="caps.js"></script>
+<script src="tips1.js"></script>
+<script src="tips2.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
