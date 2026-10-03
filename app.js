@@ -218,7 +218,8 @@
     var c = t === "c";
     $("filters").hidden = c; $("count").hidden = c; $("grid").hidden = c; $("hintOther").hidden = c;
     $("connect").hidden = !c;
-    $("acc").hidden = t !== "s";
+    $("acc")._dd.wrap.hidden = t !== "s";
+    ["mode", "score", "acc"].forEach(function (id) { $(id)._dd.sync(); });
     applyCatView();
     if (!c) { renderChips(); renderCats(); renderGrid(); }
     renderTabs();
@@ -277,11 +278,64 @@
       '<div class="box"><b>Про общий балл</b>Это среднее по всем задачам из карточки, включая те, что остаются за человеком. Поэтому профессии с физической работой или личными переговорами получают меньше. Оценка отвечает на вопрос, насколько хорошо я заменю или усилю человека на этом месте. Для сервиса это средняя оценка того, что я могу с ним сделать.</div>';
   }
 
+  function enhance(sel) {
+    var wrap = document.createElement("div"); wrap.className = "dd";
+    var btn = document.createElement("button"); btn.type = "button"; btn.className = "dd-btn";
+    btn.setAttribute("aria-haspopup", "listbox"); btn.setAttribute("aria-expanded", "false");
+    btn.setAttribute("aria-label", sel.getAttribute("aria-label") || "");
+    var list = document.createElement("ul"); list.className = "dd-list"; list.setAttribute("role", "listbox"); list.hidden = true;
+    var active = -1;
+    function items() { return [].slice.call(list.children); }
+    function sync() {
+      list.innerHTML = [].map.call(sel.options, function (o) {
+        return '<li role="option" data-v="' + esc(o.value) + '" aria-selected="' + (o.value === sel.value) + '">' + esc(o.text) + '</li>';
+      }).join("");
+      btn.textContent = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : "";
+    }
+    function setActive(i) {
+      var it = items(); if (!it.length) return;
+      active = Math.max(0, Math.min(it.length - 1, i));
+      it.forEach(function (x, k) { x.classList.toggle("active", k === active); });
+      if (it[active].scrollIntoView) it[active].scrollIntoView({ block: "nearest" });
+    }
+    function open() {
+      document.querySelectorAll(".dd-list").forEach(function (l) { if (l !== list) l.hidden = true; });
+      list.hidden = false; btn.setAttribute("aria-expanded", "true");
+      var cur = items().map(function (x) { return x.getAttribute("data-v"); }).indexOf(sel.value);
+      setActive(cur < 0 ? 0 : cur);
+    }
+    function close() { list.hidden = true; btn.setAttribute("aria-expanded", "false"); }
+    function choose(i) {
+      var it = items()[i]; if (!it) return;
+      sel.value = it.getAttribute("data-v");
+      sel.dispatchEvent(new Event("change"));
+      sync(); close(); btn.focus();
+    }
+    btn.addEventListener("click", function () { list.hidden ? open() : close(); });
+    btn.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); if (list.hidden) open(); else setActive(active + (e.key === "ArrowDown" ? 1 : -1)); }
+      else if (e.key === "Home" && !list.hidden) { e.preventDefault(); setActive(0); }
+      else if (e.key === "End" && !list.hidden) { e.preventDefault(); setActive(items().length - 1); }
+      else if ((e.key === "Enter" || e.key === " ") && !list.hidden) { e.preventDefault(); choose(active); }
+      else if (e.key === "Escape" && !list.hidden) { e.stopPropagation(); close(); }
+      else if (e.key === "Tab") close();
+    });
+    list.addEventListener("click", function (e) { var li = e.target.closest("li"); if (li) choose(items().indexOf(li)); });
+    list.addEventListener("mousemove", function (e) { var li = e.target.closest("li"); if (li) setActive(items().indexOf(li)); });
+    document.addEventListener("click", function (e) { if (!wrap.contains(e.target)) close(); });
+    wrap.appendChild(btn); wrap.appendChild(list);
+    sel.style.display = "none";
+    sel.parentNode.insertBefore(wrap, sel);
+    sel._dd = { wrap: wrap, sync: sync };
+    sync();
+  }
+
   function init() {
     $("acc").innerHTML = '<option value="">Любой доступ</option>' + ACCESS_ORDER.map(function (k) { return '<option value="' + k + '">' + ACCESS[k].name + '</option>'; }).join("");
     $("score").innerHTML = SCORES.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join("");
     $("score").addEventListener("change", function (e) { state.score = e.target.value; renderGrid(); });
     $("mode").innerHTML = '<option value="">Любой способ</option>' + MODE_ORDER.map(function (k) { return '<option value="' + k + '">' + MODES[k].name + '</option>'; }).join("");
+    ["sort", "score", "mode", "acc"].forEach(function (id) { enhance($(id)); });
     $("suggest").href = "https://github.com/" + REPO + "/issues/new?title=" + encodeURIComponent("Добавить: ");
     $("tabs").addEventListener("click", function (e) { var b = e.target.closest("[role=tab]"); if (b) setTab(b.getAttribute("data-tab")); });
     $("chips").addEventListener("click", function (e) {
