@@ -98,7 +98,32 @@
   function haystack(p) {
     return (p.n + " " + p.c + " " + p.d + " " + p.t.map(function (t) { return t[0] + " " + (t[3] || ""); }).join(" ") + " " + (p.pr || []).join(" ") + " " + (p.svc ? p.svc.map(function (s) { return s.n; }).join(" ") : "")).toLowerCase();
   }
-  function matchQ(p) { return !state.q || haystack(p).indexOf(state.q) >= 0; }
+  var SYN = [
+    ["telegram", "телеграм", "телега", "tg", "тг"], ["youtube", "ютуб", "ютьюб"], ["whatsapp", "ватсап", "вотсап", "вацап"],
+    ["instagram", "инстаграм", "инста"], ["facebook", "фейсбук", "фб"], ["viber", "вайбер"], ["tiktok", "тикток"],
+    ["ozon", "озон"], ["wildberries", "вайлдберриз", "вб", "wb"], ["google", "гугл"], ["yandex", "яндекс"], ["avito", "авито"],
+    ["1с", "1c", "ванэс"], ["эцп", "электронная подпись", "электронной подписи", "криптопро", "подпись"], ["vk", "вк", "вконтакте"],
+    ["bitrix", "битрикс"], ["amocrm", "амо", "амосрм"], ["excel", "эксель"], ["word", "ворд"], ["chatgpt", "чатгпт", "gpt", "гпт"],
+    ["deepseek", "дипсик"], ["midjourney", "миджорни"], ["whisper", "виспер"], ["github", "гитхаб"], ["slack", "слак"],
+    ["zoom", "зум"], ["notion", "ноушн"], ["figma", "фигма"], ["canva", "канва"], ["wordpress", "вордпресс"], ["tilda", "тильда"],
+    ["seo", "сео"], ["crm", "црм"], ["api", "апи"], ["mcp", "мсп"], ["gmail", "джимейл", "гмейл"], ["x (twitter)", "твиттер", "twitter"]
+  ];
+  function terms(q) {
+    var r = [q];
+    SYN.forEach(function (g) {
+      if (g.some(function (m) { return m === q || (q.length >= 3 && m.indexOf(q) === 0); })) g.forEach(function (m) { if (r.indexOf(m) < 0) r.push(m); });
+    });
+    return r;
+  }
+  function hit(hay, t) {
+    if (t.length > 2) return hay.indexOf(t) >= 0;
+    return new RegExp("(^|[^a-zа-я0-9])" + t.replace(/[^a-zа-я0-9]/g, "")).test(hay);
+  }
+  function matchQ(p) {
+    if (!state.q) return true;
+    var h = haystack(p);
+    return terms(state.q).some(function (t) { return hit(h, t); });
+  }
   function match(p) {
     if (state.cat && p.c !== state.cat) return false;
     if (state.mode && !p.modes[state.mode]) return false;
@@ -181,6 +206,7 @@
     }).join("") + '</div></div>';
   }
 
+  var lastFocus = null;
   function openItem(key, push) {
     var kind = key[0], id = parseInt(key.slice(1), 10);
     var p = (kind === "s" ? svcs : profs).filter(function (x) { return x.id === id; })[0];
@@ -203,6 +229,7 @@
       '<div class="box"><b>Чего не могу</b>' + esc(p.l) + '</div>' +
       '<div class="box"><b>Что подключить, чтобы стало лучше</b>' + esc(p.k) + '</div>' + related +
       '<p class="share">Ссылка: <a href="' + esc(link) + '">' + esc(link) + '</a></p>';
+    if ($("modal").hidden) lastFocus = document.activeElement;
     $("modal").hidden = false;
     document.body.style.overflow = "hidden";
     $("sheet").scrollTop = 0; $("modal").scrollTop = 0;
@@ -214,6 +241,7 @@
     $("modal").hidden = true;
     document.body.style.overflow = "";
     history.replaceState(null, "", location.pathname + location.search);
+    if (lastFocus && lastFocus.focus && document.contains(lastFocus)) lastFocus.focus();
   }
 
   function renderLegend() {
