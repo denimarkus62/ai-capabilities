@@ -143,6 +143,8 @@ button.catrow:hover span:first-child{color:var(--brand)}
 .cathead{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:18px 0 4px;padding:14px 16px;background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow)}
 .cathead h2{margin:0;font-size:20px;line-height:1.2}
 .cathead span{color:var(--muted);font-size:13.5px}
+.catrow.empty0{opacity:.5}
+.cathead .link,.count .link{font-size:13.5px}
 .back{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;font-size:13.5px;cursor:pointer}
 .back:hover{border-color:var(--brand);color:var(--brand)}
 

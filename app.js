@@ -58,7 +58,7 @@
   var CATS = { p: cats(profs), s: cats(svcs) };
 
   var SCORES = [["", "Балл: любой", 0, 11], ["8", "Балл: 8 и выше", 8, 11], ["7", "Балл: 7 и выше", 7, 11], ["6", "Балл: 6 и выше", 6, 11], ["5-7", "Балл: от 5 до 7", 5, 7], ["lt5", "Балл: ниже 5", 0, 5]];
-  var state = { tab: "p", q: "", cat: "", mode: "", acc: "", score: "", sort: "score" };
+  var state = { tab: "p", q: "", deep: false, cat: "", mode: "", acc: "", score: "", sort: "score" };
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
   function band(v) { for (var i = 0; i < BANDS.length; i++) if (v >= BANDS[i].min) return BANDS[i]; return BANDS[3]; }
@@ -83,17 +83,22 @@
   function renderCats() {
     var list = cur();
     $("cats").innerHTML = CATS[state.tab].map(function (c) {
-      var l = list.filter(function (p) { return p.c === c; });
-      var a = Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10;
-      return '<button class="catrow" data-catgo="' + esc(c) + '" title="Открыть список"><span>' + esc(c) + ' <small>' + l.length + '</small></span><span class="bar"><i style="width:' + a * 10 + '%;background:' + BAR_COLOR[bandKey(a)] + '"></i></span><em>' + fmt(a) + '</em></button>';
+      var all = list.filter(function (p) { return p.c === c; });
+      var l = all.filter(matchNoCat);
+      var a = l.length ? Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10 : 0;
+      var num = l.length === all.length ? String(all.length) : l.length + " из " + all.length;
+      return '<button class="catrow' + (l.length ? "" : " empty0") + '" data-catgo="' + esc(c) + '" title="Открыть список"><span>' + esc(c) + ' <small>' + num + '</small></span><span class="bar"><i style="width:' + a * 10 + '%;background:' + (l.length ? BAR_COLOR[bandKey(a)] : "transparent") + '"></i></span><em>' + (l.length ? fmt(a) : "нет") + '</em></button>';
     }).join("");
   }
 
   function catHeadHtml() {
-    var l = cur().filter(function (p) { return p.c === state.cat; });
-    var a = Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10;
+    var all = cur().filter(function (p) { return p.c === state.cat; });
+    var l = all.filter(matchNoCat);
+    var a = l.length ? Math.round(l.reduce(function (s, p) { return s + p.avg; }, 0) / l.length * 10) / 10 : 0;
     var noun = state.tab === "s" ? "сервисов" : "профессий";
-    return '<button class="back" data-catgo="">← Все направления</button><div><h2>' + esc(state.cat) + '</h2><span>' + l.length + ' ' + noun + ', средний балл ' + fmt(a) + '</span></div>';
+    var num = l.length === all.length ? l.length + " " + noun : "подходит " + l.length + " из " + all.length + " " + noun;
+    var reset = (filtersOn() && l.length !== all.length) ? ' <button class="link" data-reset="1">Сбросить фильтры</button>' : "";
+    return '<button class="back" data-catgo="">← Все направления</button><div><h2>' + esc(state.cat) + '</h2><span>' + num + (l.length ? ', средний балл ' + fmt(a) : "") + '.' + reset + '</span></div>';
   }
   function applyCatView() {
     var inCat = state.tab !== "c" && !!state.cat;
@@ -114,8 +119,18 @@
     $("chips").innerHTML = items.join("");
   }
 
-  function haystack(p) {
-    return (p.n + " " + p.c + " " + p.d + " " + p.t.map(function (t) { return t[0] + " " + (t[3] || ""); }).join(" ") + " " + (p.pr || []).join(" ") + " " + (p.svc ? p.svc.map(function (s) { return s.n; }).join(" ") : "")).toLowerCase();
+  function hayMain(p) {
+    return (p.n + " " + p.c + " " + (p.pr || []).join(" ")).toLowerCase();
+  }
+  function svcExact(p, t) {
+    return !!p.svc && p.svc.some(function (s) { return s.prof.length <= 30 && s.n.toLowerCase().split(/[^a-zа-я0-9]+/).indexOf(t) >= 0; });
+  }
+  function hayDeep(p) {
+    return (p.d + " " + p.t.map(function (t) { return t[0] + " " + (t[3] || ""); }).join(" ")).toLowerCase();
+  }
+  function stem(w) {
+    var s = w.replace(/(ами|ями|ов|ев|ей|ом|ем|ам|ям|ах|ях|ы|и|а|я|у|ю|е|о)$/, "");
+    return s.length >= 4 ? s : w;
   }
   var SYN = [
     ["telegram", "телеграм", "телега", "tg", "тг"], ["youtube", "ютуб", "ютьюб"], ["whatsapp", "ватсап", "вотсап", "вацап"],
@@ -125,10 +140,13 @@
     ["bitrix", "битрикс"], ["amocrm", "амо", "амосрм"], ["excel", "эксель"], ["word", "ворд"], ["chatgpt", "чатгпт", "gpt", "гпт"],
     ["deepseek", "дипсик"], ["midjourney", "миджорни"], ["whisper", "виспер"], ["github", "гитхаб"], ["slack", "слак"],
     ["zoom", "зум"], ["notion", "ноушн"], ["figma", "фигма"], ["canva", "канва"], ["wordpress", "вордпресс"], ["tilda", "тильда"],
-    ["seo", "сео"], ["crm", "црм"], ["api", "апи"], ["mcp", "мсп"], ["gmail", "джимейл", "гмейл"], ["x (twitter)", "твиттер", "twitter"]
+    ["seo", "сео"], ["crm", "црм"], ["api", "апи"], ["mcp", "мсп"], ["gmail", "джимейл", "гмейл"], ["x (twitter)", "твиттер", "twitter"], ["smm", "смм", "соцсети"], ["email", "имейл", "емейл"], ["excel", "эксель", "таблицы"]
   ];
   function terms(q) {
     var r = [q];
+    var sq = stem(q);
+    if (sq !== q) r.push(sq);
+    if (q.length >= 8 && /[а-я]/.test(q)) r.push(q.slice(0, q.length - 2));
     SYN.forEach(function (g) {
       if (g.some(function (m) { return m === q || (q.length >= 3 && m.indexOf(q) === 0); })) g.forEach(function (m) { if (r.indexOf(m) < 0) r.push(m); });
     });
@@ -138,13 +156,18 @@
     if (t.length > 2) return hay.indexOf(t) >= 0;
     return new RegExp("(^|[^a-zа-я0-9])" + t.replace(/[^a-zа-я0-9]/g, "")).test(hay);
   }
+  function words() { return state.q.split(/\s+/).filter(Boolean); }
+  function qMain(p) {
+    return words().every(function (w) { return terms(w).some(function (t) { return hit(hayMain(p), t) || svcExact(p, t); }); });
+  }
+  function qDeep(p) {
+    return words().every(function (w) { return terms(w).some(function (t) { return hit(hayMain(p), t) || hit(hayDeep(p), t); }); });
+  }
   function matchQ(p) {
     if (!state.q) return true;
-    var h = haystack(p);
-    return terms(state.q).some(function (t) { return hit(h, t); });
+    return qMain(p) || (state.deep && qDeep(p));
   }
-  function match(p) {
-    if (state.cat && p.c !== state.cat) return false;
+  function matchNoCat(p) {
     if (state.mode && !p.modes[state.mode]) return false;
     if (state.tab === "s" && state.acc && p.a !== state.acc) return false;
     if (state.score) {
@@ -152,6 +175,17 @@
       if (p.avg < sf[2] || p.avg >= sf[3]) return false;
     }
     return matchQ(p);
+  }
+  function match(p) { return (!state.cat || p.c === state.cat) && matchNoCat(p); }
+  function filtersOn() { return !!(state.q || state.mode || state.acc || state.score); }
+  function extraCount() {
+    if (!state.q || state.deep) return 0;
+    return cur().filter(function (p) {
+      var save = state.deep; state.deep = true;
+      var ok = (!state.cat || p.c === state.cat) && matchNoCat(p);
+      state.deep = save;
+      return ok && !qMain(p);
+    }).length;
   }
 
   function mix(p) {
@@ -195,7 +229,10 @@
     if (state.sort === "score") list.sort(function (a, b) { return b.avg - a.avg || a.n.localeCompare(b.n, "ru"); });
     else if (state.sort === "scoreAsc") list.sort(function (a, b) { return a.avg - b.avg || a.n.localeCompare(b.n, "ru"); });
     else list.sort(function (a, b) { return a.n.localeCompare(b.n, "ru"); });
-    $("count").textContent = "Показано: " + list.length + " из " + cur().length;
+    var total = state.cat ? cur().filter(function (p) { return p.c === state.cat; }).length : cur().length;
+    var ex = extraCount();
+    var note = ex ? ' <button class="link" data-deep="1">Еще ' + ex + ', где слово упоминается в описаниях и задачах. Показать</button>' : (state.q && state.deep ? ' <button class="link" data-deep="0">Показаны и упоминания в описаниях. Скрыть</button>' : "");
+    $("count").innerHTML = "Показано: " + list.length + " из " + total + note;
     if (!list.length) { $("grid").innerHTML = '<p class="empty">Ничего не нашли. Попробуйте другое слово или сбросьте фильтры.</p>'; return; }
     $("grid").innerHTML = list.map(cardHtml).join("");
   }
@@ -210,6 +247,14 @@
         '<span class="badge ' + ACCESS[s.a].color + '">' + ACCESS[s.a].name + '</span>' +
         '<span class="cbar"><i style="width:' + (s.prof.length / max * 100) + '%"></i></span><span class="cnum">' + s.prof.length + '</span></button>';
     }).join("");
+  }
+
+  function refresh() { renderCats(); applyCatView(); renderGrid(); renderTabs(); }
+  function resetFilters() {
+    state.q = ""; state.deep = false; state.mode = ""; state.acc = ""; state.score = "";
+    $("q").value = "";
+    ["mode", "score", "acc"].forEach(function (id) { $(id).value = ""; $(id)._dd.sync(); });
+    refresh();
   }
 
   function setTab(t, keepQ) {
@@ -333,7 +378,7 @@
   function init() {
     $("acc").innerHTML = '<option value="">Любой доступ</option>' + ACCESS_ORDER.map(function (k) { return '<option value="' + k + '">' + ACCESS[k].name + '</option>'; }).join("");
     $("score").innerHTML = SCORES.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join("");
-    $("score").addEventListener("change", function (e) { state.score = e.target.value; renderGrid(); });
+    $("score").addEventListener("change", function (e) { state.score = e.target.value; refresh(); });
     $("mode").innerHTML = '<option value="">Любой способ</option>' + MODE_ORDER.map(function (k) { return '<option value="' + k + '">' + MODES[k].name + '</option>'; }).join("");
     ["sort", "score", "mode", "acc"].forEach(function (id) { enhance($(id)); });
     $("suggest").href = "https://github.com/" + REPO + "/issues/new?title=" + encodeURIComponent("Добавить: ");
@@ -343,15 +388,19 @@
       selectCat(b.getAttribute("data-cat"), false);
     });
     $("q").addEventListener("input", function (e) {
-      state.q = e.target.value.trim().toLowerCase();
+      state.q = e.target.value.trim().toLowerCase(); state.deep = false;
       if (state.tab === "c") setTab("p");
-      renderGrid(); renderTabs();
+      refresh();
     });
     $("sort").addEventListener("change", function (e) { state.sort = e.target.value; renderGrid(); });
-    $("mode").addEventListener("change", function (e) { state.mode = e.target.value; renderGrid(); });
-    $("acc").addEventListener("change", function (e) { state.acc = e.target.value; renderGrid(); });
+    $("mode").addEventListener("change", function (e) { state.mode = e.target.value; refresh(); });
+    $("acc").addEventListener("change", function (e) { state.acc = e.target.value; refresh(); });
     $("hintOther").addEventListener("click", function (e) { var b = e.target.closest("[data-go]"); if (b) setTab(b.getAttribute("data-go")); });
     document.addEventListener("click", function (e) {
+      var rs = e.target.closest("[data-reset]");
+      if (rs) { resetFilters(); return; }
+      var dp = e.target.closest("[data-deep]");
+      if (dp) { state.deep = dp.getAttribute("data-deep") === "1"; refresh(); return; }
       var g = e.target.closest("[data-catgo]");
       if (g) {
         e.preventDefault(); e.stopPropagation();
