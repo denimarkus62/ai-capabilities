@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>База знаний: что умеет Claude</title>
-<meta name="description" content="Профессии и оценки по 10-балльной шкале: что Claude делает сам, через API, коннекторы и MCP, а что остается за человеком.">
+<meta name="description" content="Профессии и сервисы с оценками по 10-балльной шкале: что Claude делает сам, через API, коннекторы и MCP, а что остается за человеком.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,45 +15,61 @@
       <span class="logo" aria-hidden="true">К</span>
       <div>
         <h1>Что умеет Claude</h1>
-        <p class="sub">База знаний для команды: профессии, задачи и честные оценки по 10-балльной шкале</p>
+        <p class="sub">База знаний для команды: профессии и сервисы с честными оценками по 10-балльной шкале</p>
       </div>
     </div>
-    <a class="btn ghost" id="suggest" target="_blank" rel="noopener">Предложить профессию</a>
+    <a class="btn ghost" id="suggest" target="_blank" rel="noopener">Предложить профессию или сервис</a>
   </div>
 </header>
 
 <main class="wrap">
   <section class="stats" id="stats" aria-label="Общая сводка"></section>
 
-  <section class="panel" aria-label="Фильтры">
-    <div class="row">
-      <input id="q" type="search" placeholder="Найти профессию или задачу, например: SEO, договор, парсинг" autocomplete="off">
-      <select id="sort" aria-label="Сортировка">
-        <option value="score">Сначала сильные стороны</option>
-        <option value="scoreAsc">Сначала слабые стороны</option>
-        <option value="name">По алфавиту</option>
-      </select>
-      <select id="mode" aria-label="Способ"></select>
+  <section class="panel" aria-label="Поиск">
+    <input id="q" type="search" class="big" placeholder="Что ищете? Профессию (SEO, бухгалтер) или сервис (Telegram, YouTube, 1С)" autocomplete="off">
+    <div class="tabs" id="tabs" role="tablist">
+      <button role="tab" id="tabP" data-tab="p" aria-selected="true"></button>
+      <button role="tab" id="tabS" data-tab="s" aria-selected="false"></button>
+      <button role="tab" id="tabC" data-tab="c" aria-selected="false"></button>
     </div>
-    <div class="chips" id="chips" role="group" aria-label="Направления"></div>
+    <div id="filters">
+      <div class="row">
+        <select id="sort" aria-label="Сортировка">
+          <option value="score">Сначала сильные стороны</option>
+          <option value="scoreAsc">Сначала слабые стороны</option>
+          <option value="name">По алфавиту</option>
+        </select>
+        <select id="mode" aria-label="Способ"></select>
+        <select id="acc" aria-label="Доступ" hidden></select>
+      </div>
+      <div class="chips" id="chips" role="group" aria-label="Направления"></div>
+    </div>
   </section>
+
+  <p class="hint" id="hintOther"></p>
 
   <section class="cats" id="cats" aria-label="Средний балл по направлениям"></section>
 
   <p class="count" id="count" aria-live="polite"></p>
   <section class="grid" id="grid"></section>
 
+  <section id="connect" hidden>
+    <h2 class="h2">Что подключить в первую очередь</h2>
+    <p class="lead">Рейтинг считается сам: сервисы, к которым нужен ключ или коннектор, отсортированы по числу профессий в базе, которым они пригодятся. Чем выше строка, тем больше пользы от подключения. Нажмите на строку, чтобы увидеть, что именно нужно.</p>
+    <div class="clist" id="connectList"></div>
+  </section>
+
   <section class="legend" id="legend"></section>
 </main>
 
 <footer class="foot">
   <div class="wrap">
-    <p>Обновлено 03.10.2026. Оценки ставит сам Claude и старается не завышать. Если оценка не совпала с вашей практикой, напишите через кнопку «Предложить профессию» (откроется раздел Issues на GitHub). Мы поправим.</p>
+    <p>Обновлено 03.10.2026, вторая версия. Оценки ставит сам Claude и старается не завышать. Если оценка не совпала с вашей практикой, напишите через кнопку «Предложить профессию или сервис» (откроется раздел Issues на GitHub). Мы поправим.</p>
   </div>
 </footer>
 
 <div class="modal" id="modal" hidden>
-  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="mTitle">
     <button class="close" id="close" aria-label="Закрыть">×</button>
     <div id="mBody"></div>
   </div>
@@ -63,6 +79,14 @@
 <script src="data2.js"></script>
 <script src="data3.js"></script>
 <script src="data4.js"></script>
+<script src="data5.js"></script>
+<script src="data6.js"></script>
+<script src="data7.js"></script>
+<script src="data8.js"></script>
+<script src="svc1.js"></script>
+<script src="svc2.js"></script>
+<script src="svc3.js"></script>
+<script src="svc4.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
